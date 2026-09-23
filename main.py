@@ -1,13 +1,12 @@
+import io
 import streamlit as st
 import speech_recognition as sr
 from deep_translator import GoogleTranslator
 from gtts import gTTS
-from io import BytesIO
-import html
 
 
 # =========================================================
-# CẤU HÌNH APP
+# CẤU HÌNH
 # =========================================================
 
 st.set_page_config(
@@ -19,7 +18,7 @@ st.set_page_config(
 
 
 # =========================================================
-# CSS
+# GIAO DIỆN
 # =========================================================
 
 st.markdown("""
@@ -38,105 +37,75 @@ header {
 }
 
 .stApp {
-    background: #f6f7f9;
+    background: #0b0f14;
+    color: white;
 }
 
-/* Nội dung chính */
 .block-container {
-    max-width: 700px;
+    max-width: 720px;
     padding-top: 25px;
     padding-bottom: 40px;
 }
 
-/* Tiêu đề */
-.app-title {
+.title {
     text-align: center;
-    font-size: 32px;
+    font-size: 42px;
     font-weight: 800;
-    margin-bottom: 4px;
+    margin-bottom: 5px;
 }
 
-.app-subtitle {
+.subtitle {
     text-align: center;
-    color: #777;
-    font-size: 15px;
-    margin-bottom: 25px;
+    color: #9ca3af;
+    font-size: 17px;
+    margin-bottom: 30px;
 }
 
-/* Card */
 .card {
-    background: white;
+    background: #151a22;
+    border: 1px solid #262d38;
     border-radius: 22px;
-    padding: 20px;
-    margin-bottom: 16px;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+    padding: 22px;
+    margin-bottom: 18px;
 }
 
-/* Ngôn ngữ */
-.language-title {
+.language {
     text-align: center;
-    font-size: 19px;
-    font-weight: 700;
-}
-
-/* Mũi tên */
-.arrow {
-    padding: 0 10px;
-    color: #777;
-}
-
-/* Khu vực kết quả */
-.text-box {
-    background: #f1f3f5;
-    border-radius: 16px;
-    padding: 18px;
     font-size: 20px;
-    line-height: 1.5;
-    min-height: 70px;
-    word-wrap: break-word;
-}
-
-/* Nhãn */
-.label {
-    font-size: 15px;
     font-weight: 700;
-    margin-bottom: 9px;
+    margin-bottom: 8px;
 }
 
-/* Nút */
+.arrow {
+    text-align: center;
+    font-size: 30px;
+    color: #60a5fa;
+    margin: 8px;
+}
+
+.result-box {
+    background: #11161e;
+    border: 1px solid #2c3440;
+    border-radius: 18px;
+    padding: 20px;
+    font-size: 22px;
+    line-height: 1.5;
+    min-height: 80px;
+}
+
+.info {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
 div.stButton > button {
     width: 100%;
-    border-radius: 15px;
-    height: 48px;
-    font-size: 16px;
-    font-weight: 650;
-}
-
-/* Audio */
-audio {
-    width: 100%;
-}
-
-/* Selectbox */
-div[data-baseweb="select"] > div {
-    border-radius: 15px;
-}
-
-/* Mobile */
-@media (max-width: 600px) {
-
-    .block-container {
-        padding-left: 15px;
-        padding-right: 15px;
-    }
-
-    .app-title {
-        font-size: 28px;
-    }
-
-    .text-box {
-        font-size: 18px;
-    }
+    border-radius: 16px;
+    min-height: 52px;
+    font-size: 17px;
+    font-weight: 700;
 }
 
 </style>
@@ -144,18 +113,16 @@ div[data-baseweb="select"] > div {
 
 
 # =========================================================
-# DỮ LIỆU 4 CHẾ ĐỘ
+# 4 CHẾ ĐỘ DỊCH
 # =========================================================
 
 MODES = {
-
     "🇻🇳 Việt → 🇬🇧 Anh": {
         "source": "vi",
         "target": "en",
         "source_name": "Tiếng Việt",
         "target_name": "English",
-        "speech_language": "vi-VN",
-        "tts_language": "en"
+        "speech": "vi-VN",
     },
 
     "🇻🇳 Việt → 🇨🇳 Trung": {
@@ -163,8 +130,7 @@ MODES = {
         "target": "zh-CN",
         "source_name": "Tiếng Việt",
         "target_name": "中文",
-        "speech_language": "vi-VN",
-        "tts_language": "zh-CN"
+        "speech": "vi-VN",
     },
 
     "🇨🇳 Trung → 🇻🇳 Việt": {
@@ -172,8 +138,7 @@ MODES = {
         "target": "vi",
         "source_name": "中文",
         "target_name": "Tiếng Việt",
-        "speech_language": "zh-CN",
-        "tts_language": "vi"
+        "speech": "zh-CN",
     },
 
     "🇬🇧 Anh → 🇻🇳 Việt": {
@@ -181,8 +146,7 @@ MODES = {
         "target": "vi",
         "source_name": "English",
         "target_name": "Tiếng Việt",
-        "speech_language": "en-US",
-        "tts_language": "vi"
+        "speech": "en-US",
     }
 }
 
@@ -191,78 +155,67 @@ MODES = {
 # HÀM NHẬN DIỆN GIỌNG NÓI
 # =========================================================
 
-def recognize_speech(audio_file, language):
-
+def speech_to_text(audio_file, language):
     recognizer = sr.Recognizer()
 
     try:
+        audio_bytes = audio_file.getvalue()
 
-        # Đưa file audio về đầu file
-        audio_file.seek(0)
+        audio_stream = io.BytesIO(audio_bytes)
 
-        # Streamlit audio_input tạo file WAV
-        with sr.AudioFile(audio_file) as source:
-
+        with sr.AudioFile(audio_stream) as source:
             audio_data = recognizer.record(source)
 
-        # Google Speech Recognition
-        result = recognizer.recognize_google(
+        text = recognizer.recognize_google(
             audio_data,
             language=language
         )
 
-        return result.strip()
+        return text
 
     except sr.UnknownValueError:
-
         return None
 
     except sr.RequestError:
-
-        raise Exception(
-            "Không thể kết nối dịch vụ nhận diện giọng nói."
+        st.error(
+            "Không kết nối được dịch vụ nhận diện giọng nói. "
+            "Hãy kiểm tra Internet rồi thử lại."
         )
+        return None
 
-    except Exception as error:
-
-        raise Exception(
-            f"Lỗi xử lý âm thanh: {error}"
-        )
+    except Exception as e:
+        st.error(f"Lỗi microphone: {e}")
+        return None
 
 
 # =========================================================
-# HÀM DỊCH
+# DỊCH
 # =========================================================
 
 def translate_text(text, source, target):
 
     try:
-
         translator = GoogleTranslator(
             source=source,
             target=target
         )
 
-        result = translator.translate(text)
+        return translator.translate(text)
 
-        return result
-
-    except Exception as error:
-
-        raise Exception(
-            f"Không thể dịch câu này: {error}"
-        )
+    except Exception as e:
+        st.error(f"Lỗi dịch: {e}")
+        return None
 
 
 # =========================================================
-# HÀM TẠO GIỌNG NÓI
+# TẠO GIỌNG NÓI
 # =========================================================
 
-def create_voice(text, language):
+def text_to_speech(text, language):
 
     try:
 
-        audio_buffer = BytesIO()
+        audio_buffer = io.BytesIO()
 
         tts = gTTS(
             text=text,
@@ -276,11 +229,11 @@ def create_voice(text, language):
 
         return audio_buffer
 
-    except Exception as error:
+    except Exception as e:
 
-        raise Exception(
-            f"Không thể tạo giọng nói: {error}"
-        )
+        st.error(f"Lỗi tạo giọng nói: {e}")
+
+        return None
 
 
 # =========================================================
@@ -288,14 +241,12 @@ def create_voice(text, language):
 # =========================================================
 
 st.markdown(
-    '<div class="app-title">🌐 Dịch Nhanh</div>',
+    '<div class="title">🌐 Dịch Nhanh</div>',
     unsafe_allow_html=True
 )
 
 st.markdown(
-    '<div class="app-subtitle">'
-    'Nói • Dịch • Nghe'
-    '</div>',
+    '<div class="subtitle">Dịch giọng nói Việt • Anh • Trung</div>',
     unsafe_allow_html=True
 )
 
@@ -304,12 +255,12 @@ st.markdown(
 # CHỌN CHẾ ĐỘ
 # =========================================================
 
-mode_name = st.selectbox(
+mode = st.selectbox(
     "Chọn chế độ dịch",
     list(MODES.keys())
 )
 
-mode = MODES[mode_name]
+config = MODES[mode]
 
 
 # =========================================================
@@ -319,11 +270,19 @@ mode = MODES[mode_name]
 st.markdown(
     f"""
     <div class="card">
-        <div class="language-title">
-            {mode["source_name"]}
-            <span class="arrow">→</span>
-            {mode["target_name"]}
+
+        <div class="language">
+            🎤 {config["source_name"]}
         </div>
+
+        <div class="arrow">
+            ↓
+        </div>
+
+        <div class="language">
+            🔊 {config["target_name"]}
+        </div>
+
     </div>
     """,
     unsafe_allow_html=True
@@ -331,216 +290,173 @@ st.markdown(
 
 
 # =========================================================
-# MICRO
+# MICROPHONE
 # =========================================================
 
 st.markdown(
-    """
-    <div style="
-        text-align:center;
-        font-size:15px;
-        color:#666;
-        margin-bottom:8px;
-    ">
-        🎙️ Nhấn nút bên dưới và nói
-    </div>
-    """,
-    unsafe_allow_html=True
+    "### 🎙️ Nói vào microphone"
 )
 
-
-audio = st.audio_input(
-    "🎙️ Nhấn để nói",
-    sample_rate=16000
+audio_input = st.audio_input(
+    "Nhấn để ghi âm",
+    sample_rate=16000,
+    key=f"mic_{mode}",
+    label_visibility="collapsed"
 )
 
 
 # =========================================================
-# KHI NGƯỜI DÙNG NÓI
+# XỬ LÝ GIỌNG NÓI
 # =========================================================
 
-if audio is not None:
+if audio_input:
 
-    # -----------------------------------------------------
-    # NHẬN DIỆN
-    # -----------------------------------------------------
+    with st.spinner("🎧 Đang nhận diện giọng nói..."):
 
-    with st.spinner("🎧 Đang nghe và nhận diện..."):
-
-        try:
-
-            original_text = recognize_speech(
-                audio,
-                mode["speech_language"]
-            )
-
-        except Exception as error:
-
-            st.error(str(error))
-            st.stop()
-
-
-    # -----------------------------------------------------
-    # KHÔNG NGHE ĐƯỢC
-    # -----------------------------------------------------
-
-    if not original_text:
-
-        st.warning(
-            "😕 Mình chưa nghe rõ. "
-            "Bạn thử nói gần mic hơn và chậm hơn một chút nhé."
+        spoken_text = speech_to_text(
+            audio_input,
+            config["speech"]
         )
 
-        st.stop()
+    if spoken_text:
 
+        st.markdown("### 📝 Bạn nói")
 
-    # -----------------------------------------------------
-    # HIỂN THỊ CÂU GỐC
-    # -----------------------------------------------------
-
-    safe_original = html.escape(original_text)
-
-    st.markdown(
-        f"""
-        <div class="card">
-
-            <div class="label">
-                🗣️ Bạn nói
+        st.markdown(
+            f"""
+            <div class="result-box">
+            {spoken_text}
             </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-            <div class="text-box">
-                {safe_original}
-            </div>
-
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-    # -----------------------------------------------------
-    # DỊCH
-    # -----------------------------------------------------
-
-    with st.spinner("🌐 Đang dịch..."):
-
-        try:
+        with st.spinner("🌐 Đang dịch..."):
 
             translated_text = translate_text(
-                original_text,
-                mode["source"],
-                mode["target"]
+                spoken_text,
+                config["source"],
+                config["target"]
             )
 
-        except Exception as error:
+        if translated_text:
 
-            st.error(str(error))
-            st.stop()
+            st.markdown("### 🔊 Bản dịch")
 
+            st.markdown(
+                f"""
+                <div class="result-box">
+                {translated_text}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-    # -----------------------------------------------------
-    # HIỂN THỊ BẢN DỊCH
-    # -----------------------------------------------------
+            # =============================================
+            # TẠO ÂM THANH
+            # =============================================
 
-    safe_translation = html.escape(
-        translated_text
-    )
+            tts_language = config["target"]
 
-    st.markdown(
-        f"""
-        <div class="card">
+            # gTTS dùng zh-CN cho tiếng Trung
+            if tts_language == "zh-CN":
+                tts_language = "zh-CN"
 
-            <div class="label">
-                🌐 Bản dịch
-            </div>
-
-            <div class="text-box">
-                {safe_translation}
-            </div>
-
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-    # -----------------------------------------------------
-    # TẠO GIỌNG NÓI
-    # -----------------------------------------------------
-
-    with st.spinner("🔊 Đang tạo giọng đọc..."):
-
-        try:
-
-            voice = create_voice(
+            audio_output = text_to_speech(
                 translated_text,
-                mode["tts_language"]
+                tts_language
             )
 
-        except Exception as error:
+            if audio_output:
 
-            st.error(str(error))
-            st.stop()
+                st.markdown("### 🔊 Nghe bản dịch")
 
+                st.audio(
+                    audio_output,
+                    format="audio/mp3"
+                )
 
-    # -----------------------------------------------------
-    # PHÁT ÂM THANH
-    # -----------------------------------------------------
+                st.download_button(
+                    "⬇️ Lưu giọng nói",
+                    data=audio_output.getvalue(),
+                    file_name="ban_dich.mp3",
+                    mime="audio/mpeg"
+                )
 
-    st.markdown(
-        '<div class="card">',
-        unsafe_allow_html=True
-    )
+    else:
 
-    st.markdown(
-        "### 🔊 Nghe bản dịch"
-    )
-
-    st.audio(
-        voice,
-        format="audio/mp3"
-    )
-
-    st.markdown(
-        '</div>',
-        unsafe_allow_html=True
-    )
+        st.warning(
+            "Không nghe rõ giọng nói. "
+            "Hãy nói gần microphone và thử lại."
+        )
 
 
 # =========================================================
-# HƯỚNG DẪN
+# NHẬP VĂN BẢN THỦ CÔNG
 # =========================================================
 
-with st.expander("ℹ️ Cách sử dụng"):
+st.divider()
 
-    st.write(
-        """
-        **Bước 1:** Chọn ngôn ngữ cần dịch.
+st.markdown("### ⌨️ Hoặc nhập văn bản")
 
-        **Bước 2:** Nhấn nút 🎙️ và nói.
+manual_text = st.text_area(
+    "Nội dung",
+    placeholder="Nhập câu bạn muốn dịch...",
+    height=120,
+    label_visibility="collapsed"
+)
 
-        **Bước 3:** Ứng dụng nhận diện câu nói.
 
-        **Bước 4:** Ứng dụng dịch sang ngôn ngữ còn lại.
+if st.button("🌐 Dịch văn bản"):
 
-        **Bước 5:** Nhấn ▶️ để nghe bản dịch.
-        """
-    )
+    if manual_text.strip():
+
+        with st.spinner("Đang dịch..."):
+
+            result = translate_text(
+                manual_text,
+                config["source"],
+                config["target"]
+            )
+
+        if result:
+
+            st.markdown("### 🔊 Kết quả")
+
+            st.markdown(
+                f"""
+                <div class="result-box">
+                {result}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            audio_output = text_to_speech(
+                result,
+                config["target"]
+            )
+
+            if audio_output:
+
+                st.audio(
+                    audio_output,
+                    format="audio/mp3"
+                )
+
+    else:
+
+        st.warning("Bạn chưa nhập nội dung.")
 
 
 # =========================================================
-# CHÂN TRANG
+# THÔNG TIN
 # =========================================================
 
 st.markdown(
     """
-    <div style="
-        text-align:center;
-        color:#999;
-        font-size:13px;
-        margin-top:30px;
-    ">
-        🌐 Dịch Nhanh • Việt • Anh • Trung
+    <div class="info">
+    🎙️ Nhận diện giọng nói → 🌐 Dịch → 🔊 Phát âm thanh
     </div>
     """,
     unsafe_allow_html=True
